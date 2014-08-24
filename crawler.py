@@ -1,6 +1,7 @@
 import urllib2
 import re
 import string
+import pprint
 
 #find a url on a page based on a name--name can be a comma separated string
 
@@ -13,42 +14,39 @@ def retrieve_tags(line, tagname):
 		re_result = re_result.group(0)
 		return re_result
 
+
+
+
 #split each tag into a bunch of list elements, then parse those out
 def parse_html_tag(line):
-	global html_info
-	if '<title' in line:
-		split_line = re.split('<title>|</title>', line)
-		url_title = split_line[1]
-		return url_title
-
-	split_line = re.split('<[A-Za-z]*? |" |">|</', line)
-	url_title = split_line[1]
-
-	if 'href' not in split_line:
-		return
-	for element in split_line:
-		print element
-		if element == '':
-			next
-		
-		if 'href=' in element:
-			url = element.split('"')[1]
-			print url
-			
-		if '>' not in element and url_title is None:
-			url_title = element.split('"')[1]
-			print url_title
-
-		if 'title=' in element:
-			url_title = element.split('"')[1]
-			print url_title
-	html_info = (url, url_title)
 	
+	tag_type = re.split('<| |>', line)[1]
+	
+	tag_attributes = set(re.split('<[A-Za-z]*? |" |">.*', line))
+	
+	tag_content = re.split('<.*?>', line)[1]
+	
+	if tag_type == 'title':
+		url_title = tag_content
+		return url_title
+		
+	if tag_type == 'a' and 'href=' in line:
+		for attribute in tag_attributes:
+			if 'href=' in attribute:
+				url = attribute.split('href=')[1][1:]
+			if 'title=' in attribute:
+				url_title = attribute.split('title=')[1][1:]
+		
+		if 'url_title' not in locals():
+			url_title = tag_content
+	
+	html_info = (url, url_title)
+	return html_info
 
-def find_page_info(url, dic):
+
+def find_page_info(url):
 	page_text = urllib2.urlopen(url)
-
-	#find the title then find all <a> tags--I think this is inefficient, since all <a>s come after <title>, but I dont feel like solving this right now
+		
 
 	for line in page_text:
 		global page_title
@@ -63,12 +61,12 @@ def find_page_info(url, dic):
 	a_tags = set()
 	for line in page_text:
 		a_result = retrieve_tags(line, 'a')
-		if a_result is not None:
-			parse_html_tag(a_result)
-			a_tags.add(html_info[0])
-that = dict()
-find_page_info('http://en.wikipedia.org/wiki/List', that)
-print that
+		if a_result is not None and a_result != '':
+			html_info = parse_html_tag(a_result)
+			a_tags.add(html_info)
+			
+	
+
 
 #########################
 ## Final Structure	 ##
@@ -78,8 +76,8 @@ print that
 #				text : "total page text?"
 #		 external_urls : [url, url]
 #				sub_pages : {
-#					  $title : {
-#						   url : "/url"
+#					  $url : {
+#						   title : "$title"
 #						   text : "the text of the page"
 #				external_urls : []
 #						   sub_pages : {}
@@ -93,31 +91,37 @@ print that
 
 crawled_urls = dict()
 
-def crawl(seed_url): 
-	crawled_urls[seed_url] = dict()
+def crawl(seed_url, dictionary): 
+	
+	if seed_url not in dictionary.keys():
+		dictionary[seed_url] = dict()
+		
+	working_dict = dictionary[seed_url]
 	
 	#returns the page title (page_title) and tags (a_tags)
-	find_page_info(seed_url, crawled_urls[seed_url])  
+	find_page_info(seed_url)  
 	
-	crawled_urls[seed_url]['title'] = page_title
+	working_dict['title'] = page_title
 	
-	crawled_urls[seed_url]['sub_pages'] = dict()
+	working_dict['sub_pages'] = dict()
+	
+	working_dict['text'] = urllib2.urlopen(seed_url).read()
 	
 	#returns url_title and url
-	for line in a_tags:
-		parse_html_tag(line)
-		
-		if seed_url in line or 'http' not in line: 
-			crawled_urls[seed_url]['sub_pages'][html_info[0]] = dict()
-			crawled_urls[seed_url]['sub_pages'][html_info[0]]['title'] = html_info[1]
+	for tag in a_tags:
+		if seed_url in tag[0] or 'http' not in tag[0]: 
+			working_dict['sub_pages'][tag[0]] = dict()
+			working_dict['sub_pages'][tag[0]]['title'] = tag[1]
 		else:
-			if 'external_urls' in crawled_urls[seed_url]['external_urls'].keys():
-				crawled_urls[seed_url]['external_urls'] = [html_info[0]]
+			if 'external_urls' in working_dict.keys():
+				working_dict['external_urls'].add(tag[0])
 			else:
-				crawled_urls[seed_url]['external_urls'] = [html_info[0]]
+				working_dict['external_urls'] = set()
+				working_dict['external_urls'].add(tag[0])
 
-	print crawled_urls
 	
 
+this_dict = dict()
+crawl('http://www.kpcb.com/', this_dict)
 
-#crawl('http://en.wikipedia.org/wiki/List')
+pprint.pprint(this_dict, width=4)
