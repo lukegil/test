@@ -32,6 +32,7 @@ def parse_html_tag(line):
 		
 	if tag_type == 'a' and 'href=' in line:
 		for attribute in tag_attributes:
+			print attribute
 			if 'href=' in attribute:
 				url = attribute.split('href=')[1][1:]
 			if 'title=' in attribute:
@@ -40,8 +41,8 @@ def parse_html_tag(line):
 		if 'url_title' not in locals():
 			url_title = tag_content
 	
-	html_info = (url, url_title)
-	return html_info
+		html_info = (url, url_title)
+		return html_info
 
 
 def find_page_info(url):
@@ -63,6 +64,7 @@ def find_page_info(url):
 		a_result = retrieve_tags(line, 'a')
 		if a_result is not None and a_result != '':
 			html_info = parse_html_tag(a_result)
+			print html_info
 			a_tags.add(html_info)
 			
 	
@@ -106,9 +108,11 @@ def crawl(seed_url, dictionary):
 	working_dict['sub_pages'] = dict()
 	
 	working_dict['text'] = urllib2.urlopen(seed_url).read()
-	
+		
 	#returns url_title and url
 	for tag in a_tags:
+		if tag is None:
+			continue
 		if seed_url in tag[0] or 'http' not in tag[0]: 
 			working_dict['sub_pages'][tag[0]] = dict()
 			working_dict['sub_pages'][tag[0]]['title'] = tag[1]
@@ -122,6 +126,6 @@ def crawl(seed_url, dictionary):
 	
 
 this_dict = dict()
-crawl('http://www.kpcb.com/', this_dict)
+crawl('http://betaworks.com', this_dict)
 
 pprint.pprint(this_dict, width=4)
