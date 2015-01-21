@@ -1,0 +1,5 @@
+import scrapy
+
+class testCrawl(scrapy.Spider):
+      name = "test crawler"
+      
